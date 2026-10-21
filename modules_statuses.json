@@ -1,9 +1,10 @@
 {
-    "User": true,
-    "Settings": true,
-    "UserNotifications": true,
-    "Chat": true,
-    "Authorization": true,
-    "Blog": true,
-    "Teachers": true
+    "User":  true,
+    "Settings":  true,
+    "UserNotifications":  true,
+    "Chat":  true,
+    "Authorization":  true,
+    "Blog":  true,
+    "Teachers":  true,
+    "Classroom":  true
 }

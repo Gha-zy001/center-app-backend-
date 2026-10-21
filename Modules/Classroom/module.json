@@ -1,0 +1,11 @@
+{
+    "name": "Classroom",
+    "alias": "classroom",
+    "description": "What a teacher manages day to day: groups, students, attendance, exams and grades.",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Classroom\\Providers\\ClassroomServiceProvider"
+    ],
+    "files": []
+}
