@@ -4,9 +4,12 @@ namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
+use Modules\Authorization\app\Models\Admin;
 use Modules\Teachers\app\Models\Teacher;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 class TelegramParentsTest extends TestCase
@@ -141,6 +144,23 @@ class TelegramParentsTest extends TestCase
         $this->postJson(self::BASE.'/attendance/scan', $body)->assertJsonPath('data.parentNotified', true);
         $this->postJson(self::BASE.'/attendance/scan', $body)->assertJsonPath('data.parentNotified', false);
         $this->assertCount(1, array_slice($this->sentTexts(), $already));
+    }
+
+    public function test_admin_sees_the_shared_bot_as_active_and_cannot_change_it(): void
+    {
+        $teacher = Teacher::create(['name' => 'T', 'username' => 'tt', 'password' => 'Str0ng!Pass1']);
+        $admin = Admin::create(['name' => 'Boss', 'email' => 'boss@example.com', 'password' => Hash::make('Str0ng!Pass1')]);
+        foreach (['view-teachers', 'edit-teacher'] as $name) {
+            $admin->givePermissionTo(Permission::firstOrCreate(['name' => $name, 'guard_name' => 'admin']));
+        }
+        Sanctum::actingAs($admin, ['*'], 'sanctum-admin');
+
+        $this->getJson("/api/v1/admin/teachers/{$teacher->id}/bot")->assertOk()
+            ->assertJsonPath('data.bot.username', 'followup_bot')
+            ->assertJsonPath('data.bot.status', 'active')
+            ->assertJsonPath('data.managerBot', null);
+        $this->putJson("/api/v1/admin/teachers/{$teacher->id}/bot", ['name' => 'X', 'username' => 'x_bot'])
+            ->assertStatus(409)->assertJsonPath('code', 'bot_shared');
     }
 
     public function test_a_parent_without_a_linked_account_is_reported_as_not_linked(): void

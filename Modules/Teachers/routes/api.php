@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Support\Facades\Route;
+use Modules\Teachers\app\Http\Controllers\V1\AdminTeacherBotController;
 use Modules\Teachers\app\Http\Controllers\V1\AdminTeacherController;
 use Modules\Teachers\app\Http\Controllers\V1\TeacherAuthController;
 use Modules\Teachers\app\Http\Middleware\ResolveTeacherContext;
@@ -21,6 +22,8 @@ Route::prefix('v1')->middleware([SetLocale::class])->group(function () {
 
             Route::post('/{teacher}/activate', [AdminTeacherController::class, 'activate'])->middleware('can:change-teacher-status');
             Route::post('/{teacher}/deactivate', [AdminTeacherController::class, 'deactivate'])->middleware('can:change-teacher-status');
+            Route::get('/{teacher}/bot', [AdminTeacherBotController::class, 'show'])->middleware('can:view-teachers');
+            Route::put('/{teacher}/bot', [AdminTeacherBotController::class, 'update'])->middleware('can:edit-teacher');
             Route::post('/{teacher}/password', [AdminTeacherController::class, 'updatePassword'])->middleware('can:edit-teacher');
         });
 
