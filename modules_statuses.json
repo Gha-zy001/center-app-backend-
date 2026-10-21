@@ -4,5 +4,6 @@
     "UserNotifications": true,
     "Chat": true,
     "Authorization": true,
-    "Blog": true
+    "Blog": true,
+    "Teachers": true
 }

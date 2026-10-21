@@ -1,0 +1,11 @@
+{
+    "name": "Teachers",
+    "alias": "teachers",
+    "description": "Teacher accounts (the tenants of the center) and their authentication.",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Teachers\\Providers\\TeachersServiceProvider"
+    ],
+    "files": []
+}

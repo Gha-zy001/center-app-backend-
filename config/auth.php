@@ -1,6 +1,7 @@
 <?php
 
 use Modules\Authorization\app\Models\Admin;
+use Modules\Teachers\app\Models\Teacher;
 use Modules\User\app\Models\User;
 
 return [
@@ -68,6 +69,12 @@ return [
             'driver' => 'sanctum',
             'provider' => 'admins',
         ],
+
+        // Teacher API tokens.
+        'sanctum-teacher' => [
+            'driver' => 'sanctum',
+            'provider' => 'teachers',
+        ],
     ],
 
     /*
@@ -96,6 +103,11 @@ return [
         'admins' => [
             'driver' => 'eloquent',
             'model' => Admin::class,
+        ],
+
+        'teachers' => [
+            'driver' => 'eloquent',
+            'model' => Teacher::class,
         ],
 
         // 'users' => [

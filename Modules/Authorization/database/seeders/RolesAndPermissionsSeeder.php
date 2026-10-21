@@ -48,6 +48,12 @@ class RolesAndPermissionsSeeder extends Seeder
             'view-activity',
             'delete-activity',
 
+            'view-teachers',
+            'create-teacher',
+            'edit-teacher',
+            'delete-teacher',
+            'change-teacher-status',
+
             'manage-settings',
             'send-notifications',
         ];
