@@ -1,0 +1,11 @@
+{
+    "name": "UserNotifications",
+    "alias": "usernotifications",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\UserNotifications\\app\\Providers\\UserNotificationsServiceProvider"
+    ],
+    "files": []
+}
