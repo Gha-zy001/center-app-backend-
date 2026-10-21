@@ -8,9 +8,12 @@ use Modules\Classroom\app\Models\Exam;
 use Modules\Classroom\app\Models\Grade;
 use Modules\Classroom\app\Models\Group;
 use Modules\Classroom\app\Models\Student;
+use Modules\Classroom\app\Services\ParentNotifier;
 
 class ExamController extends ClassroomController
 {
+    public function __construct(private readonly ParentNotifier $notifier) {}
+
     public function index(Request $request): JsonResponse
     {
         $groupId = $request->query('groupId');
@@ -92,7 +95,12 @@ class ExamController extends ClassroomController
         if ($score === null) {
             Grade::where('exam_id', $exam->id)->where('student_id', $student->id)->delete();
         } else {
-            Grade::updateOrCreate(['exam_id' => $exam->id, 'student_id' => $student->id], ['score' => $score]);
+            $grade = Grade::updateOrCreate(['exam_id' => $exam->id, 'student_id' => $student->id], ['score' => $score]);
+
+            // Only a real change reaches the parent, not a re-save of the same score.
+            if ($grade->wasRecentlyCreated || $grade->wasChanged('score')) {
+                $this->notifier->grade($student, $exam, (float) $score);
+            }
         }
 
         return $this->successResponse('OK', ['studentId' => (string) $student->id, 'score' => $score === null ? null : (float) $score]);

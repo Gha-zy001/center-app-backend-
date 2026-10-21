@@ -28,6 +28,11 @@ class Student extends Model
         return $this->belongsTo(Group::class, 'group_id');
     }
 
+    public function telegramContacts(): HasMany
+    {
+        return $this->hasMany(TelegramContact::class);
+    }
+
     public function attendance(): HasMany
     {
         return $this->hasMany(AttendanceRecord::class);

@@ -9,9 +9,13 @@ use Modules\Classroom\app\Models\AttendanceRecord;
 use Modules\Classroom\app\Models\Exam;
 use Modules\Classroom\app\Models\Group;
 use Modules\Classroom\app\Models\Student;
+use Modules\Classroom\app\Models\TelegramContact;
+use Modules\Classroom\app\Services\TelegramClient;
 
 class StudentController extends ClassroomController
 {
+    public function __construct(private readonly TelegramClient $telegram) {}
+
     public function index(Request $request): JsonResponse
     {
         $search = trim((string) $request->query('search', ''));
@@ -150,9 +154,13 @@ class StudentController extends ClassroomController
     {
         return $this->present($student) + [
             'qrCode' => $student->qr_code,
-            // Telegram bots are not wired up yet, so no parent link exists.
-            'telegramLink' => null,
-            'telegramContacts' => [],
+            // One link for every parent: they press Start and prove the number by sharing it.
+            'telegramLink' => $this->telegram->botLink(),
+            'telegramContacts' => $student->telegramContacts()->orderBy('id')->get()->map(fn (TelegramContact $contact) => [
+                'id' => (string) $contact->id,
+                'name' => $contact->name,
+                'linkedAt' => $contact->created_at->toIso8601String(),
+            ]),
         ];
     }
 }

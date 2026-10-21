@@ -6,7 +6,11 @@ use Modules\Classroom\app\Http\Controllers\V1\AttendanceController;
 use Modules\Classroom\app\Http\Controllers\V1\ExamController;
 use Modules\Classroom\app\Http\Controllers\V1\GroupController;
 use Modules\Classroom\app\Http\Controllers\V1\StudentController;
+use Modules\Classroom\app\Http\Controllers\V1\TelegramWebhookController;
 use Modules\Teachers\app\Http\Middleware\ResolveTeacherContext;
+
+// Telegram calls this itself (no login): the controller checks the shared secret.
+Route::post('v1/telegram/webhook', TelegramWebhookController::class);
 
 // Everything a teacher manages. ResolveTeacherContext scopes every query to the signed-in teacher.
 Route::prefix('v1/teacher')

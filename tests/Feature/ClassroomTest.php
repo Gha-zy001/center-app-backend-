@@ -67,8 +67,8 @@ class ClassroomTest extends TestCase
         $this->assertNotEmpty($student['id']);
         $this->getJson(self::BASE.'/students?search=omar')->assertJsonPath('data.total', 1);
         $this->getJson(self::BASE.'/students?search=zzz')->assertJsonPath('data.total', 0);
-        $this->getJson(self::BASE."/students/{$student['id']}")->assertJsonPath('data.student.telegramLink', null)
-            ->assertJsonStructure(['data' => ['student' => ['qrCode']]]);
+        $this->getJson(self::BASE."/students/{$student['id']}")->assertJsonPath('data.student.telegramContacts', [])
+            ->assertJsonStructure(['data' => ['student' => ['qrCode', 'telegramLink']]]);
     }
 
     public function test_another_teachers_rows_are_404(): void

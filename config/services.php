@@ -76,6 +76,13 @@ return [
         'sender' => env('OURSMS_SENDER'),
     ],
 
+    // One platform bot for every parent: a parent presses Start and shares their phone number.
+    'telegram' => [
+        'token' => env('TELEGRAM_BOT_TOKEN'),
+        'bot_username' => env('TELEGRAM_BOT_USERNAME'),
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+    ],
+
     'twilio' => [
         'sid' => env('TWILIO_SID'),
         'auth_token' => env('TWILIO_AUTH_TOKEN'),

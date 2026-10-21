@@ -8,13 +8,12 @@ use Modules\Classroom\app\Models\AttendanceRecord;
 use Modules\Classroom\app\Models\ClosedSession;
 use Modules\Classroom\app\Models\Group;
 use Modules\Classroom\app\Models\Student;
+use Modules\Classroom\app\Services\ParentNotifier;
 
-/**
- * Parents are not messaged yet (the Telegram bot is not wired up), so every response reports
- * "no parent notified".
- */
 class AttendanceController extends ClassroomController
 {
+    public function __construct(private readonly ParentNotifier $notifier) {}
+
     public function session(Request $request): JsonResponse
     {
         $data = $request->validate($this->sessionRules());
@@ -62,10 +61,14 @@ class AttendanceController extends ClassroomController
         $record->status = AttendanceRecord::PRESENT;
         $record->save();
 
+        // Parents hear about a student once: scanning the same card again says nothing.
+        $student->setRelation('group', $group);
+        $notified = ! $alreadyRecorded && $this->notifier->present($student, $data['date']);
+
         return $this->successResponse('OK', [
             'student' => ['id' => (string) $student->id, 'name' => $student->name],
             'alreadyRecorded' => $alreadyRecorded,
-            'parentNotified' => false,
+            'parentNotified' => $notified,
         ]);
     }
 
@@ -77,6 +80,8 @@ class AttendanceController extends ClassroomController
         $recorded = AttendanceRecord::where('group_id', $group->id)->whereDate('date', $data['date'])->pluck('student_id');
         $unrecorded = Student::where('group_id', $group->id)->whereNotIn('id', $recorded)->get();
 
+        $notified = 0;
+
         foreach ($unrecorded as $student) {
             AttendanceRecord::create([
                 'student_id' => $student->id,
@@ -84,14 +89,17 @@ class AttendanceController extends ClassroomController
                 'date' => $data['date'],
                 'status' => AttendanceRecord::ABSENT,
             ]);
+
+            $student->setRelation('group', $group);
+            $notified += (int) $this->notifier->absent($student, $data['date']);
         }
 
         ClosedSession::firstOrCreate(['group_id' => $group->id, 'date' => $data['date']]);
 
         return $this->successResponse('OK', [
             'absentCount' => $unrecorded->count(),
-            'parentsNotified' => 0,
-            'parentsNotLinked' => $unrecorded->count(),
+            'parentsNotified' => $notified,
+            'parentsNotLinked' => $unrecorded->count() - $notified,
         ]);
     }
 

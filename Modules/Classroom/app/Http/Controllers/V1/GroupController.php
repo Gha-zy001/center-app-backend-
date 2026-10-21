@@ -5,9 +5,13 @@ namespace Modules\Classroom\app\Http\Controllers\V1;
 use Illuminate\Http\JsonResponse;
 use Modules\Classroom\app\Http\Requests\GroupRequest;
 use Modules\Classroom\app\Models\Group;
+use Modules\Classroom\app\Models\Student;
+use Modules\Classroom\app\Services\ParentNotifier;
 
 class GroupController extends ClassroomController
 {
+    public function __construct(private readonly ParentNotifier $notifier) {}
+
     public function index(): JsonResponse
     {
         $groups = Group::withCount('students')->orderBy('name')->get();
@@ -37,7 +41,13 @@ class GroupController extends ClassroomController
             return $this->fail('group_name_taken', 409);
         }
 
-        $group->update($data);
+        $group->fill($data);
+        $scheduleChanged = $group->isDirty(['days', 'time']);
+        $group->save();
+
+        if ($scheduleChanged) {
+            $group->students->each(fn (Student $student) => $this->notifier->schedule($student, $group));
+        }
 
         return $this->successResponse('OK', ['group' => $this->present($group->loadCount('students'))]);
     }
