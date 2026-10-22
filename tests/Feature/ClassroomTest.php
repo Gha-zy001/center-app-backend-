@@ -107,6 +107,96 @@ class ClassroomTest extends TestCase
         $this->getJson(self::BASE."/students/{$absent['id']}/attendance")->assertJsonPath('data.absentCount', 1);
     }
 
+    private function sessionStatus(array $group, string $date): ?string
+    {
+        return $this->getJson(self::BASE."/attendance/session?groupId={$group['id']}&date=$date")->json('data.students.0.status');
+    }
+
+    public function test_manual_status_cycles_and_session_and_history_follow(): void
+    {
+        $this->actAs();
+        $group = $this->makeGroup();
+        $student = $this->makeStudent($group['id']);
+        $today = now()->toDateString();
+        $put = fn (?string $status) => $this->putJson(self::BASE.'/attendance/status', [
+            'groupId' => (string) $group['id'], 'studentId' => (string) $student['id'], 'date' => $today, 'status' => $status, 'extra' => 'x',
+        ]);
+
+        foreach ([null, 'present', 'absent', null, 'present', 'present'] as $status) {
+            $put($status)->assertOk()->assertJsonPath('data.status', $status)->assertJsonPath('data.studentId', (string) $student['id']);
+            $this->assertSame($status, $this->sessionStatus($group, $today));
+        }
+
+        $this->assertDatabaseCount('attendance_records', 1);
+        $this->getJson(self::BASE."/students/{$student['id']}/attendance")->assertJsonPath('data.presentCount', 1);
+        $put(null)->assertOk();
+        $this->getJson(self::BASE."/students/{$student['id']}/attendance")->assertJsonPath('data.items', []);
+    }
+
+    public function test_manual_status_on_a_closed_session_and_close_counts(): void
+    {
+        $this->actAs();
+        $group = $this->makeGroup();
+        $a = $this->makeStudent($group['id'], 'A');
+        $b = $this->makeStudent($group['id'], 'B');
+        $c = $this->makeStudent($group['id'], 'C');
+        $today = now()->toDateString();
+        $set = fn (array $s, ?string $status) => $this->putJson(self::BASE.'/attendance/status', [
+            'groupId' => (string) $group['id'], 'studentId' => (string) $s['id'], 'date' => $today, 'status' => $status,
+        ]);
+
+        $set($a, 'absent')->assertOk();
+        $set($b, 'present')->assertOk();
+        // C is not recorded: only C is newly absent at close.
+        $this->postJson(self::BASE.'/attendance/close', ['groupId' => (int) $group['id'], 'date' => $today])->assertJsonPath('data.absentCount', 1);
+
+        $set($a, 'present')->assertOk();
+        $set($b, 'absent')->assertOk();
+        $this->getJson(self::BASE."/attendance/session?groupId={$group['id']}&date=$today")->assertJsonPath('data.closed', true);
+
+        $qr = $this->getJson(self::BASE."/students/{$b['id']}")->json('data.student.qrCode');
+        $this->postJson(self::BASE.'/attendance/scan', ['groupId' => (int) $group['id'], 'date' => $today, 'qrCode' => $qr])
+            ->assertJsonPath('data.alreadyRecorded', false);
+        $this->postJson(self::BASE.'/attendance/scan', ['groupId' => (int) $group['id'], 'date' => $today, 'qrCode' => $qr])
+            ->assertJsonPath('data.alreadyRecorded', true);
+        $this->assertDatabaseCount('attendance_records', 3);
+    }
+
+    public function test_manual_status_validation_and_ownership(): void
+    {
+        $this->actAs();
+        $group = $this->makeGroup();
+        $other = $this->makeGroup('Math B');
+        $student = $this->makeStudent($group['id']);
+        $today = now()->toDateString();
+        $ok = ['groupId' => (string) $group['id'], 'studentId' => (string) $student['id'], 'date' => $today, 'status' => 'present'];
+        $url = self::BASE.'/attendance/status';
+
+        foreach ([
+            ['status' => 'late'], ['status' => ''], ['status' => 0], ['status' => 'Present'],
+            ['date' => '2026-02-30'], ['date' => now()->addDays(3)->toDateString()], ['date' => '22/10/2026'],
+            ['groupId' => ''], ['studentId' => 5], ['groupId' => 'abc'],
+        ] as $bad) {
+            $this->putJson($url, $bad + $ok)->assertStatus(400)->assertJsonPath('code', 'invalid_request');
+        }
+        $missing = $ok;
+        unset($missing['status']);
+        $this->putJson($url, $missing)->assertStatus(400);
+        $this->call('PUT', $url, [], [], [], ['CONTENT_TYPE' => 'application/json'], 'not json')->assertStatus(400);
+
+        $this->putJson($url, ['groupId' => (string) $other['id']] + $ok)->assertNotFound()->assertJsonPath('code', 'student_not_found');
+        $this->putJson($url, ['studentId' => '99999'] + $ok)->assertNotFound();
+
+        $this->actAs('sara');
+        $this->putJson($url, $ok)->assertNotFound();
+        $this->assertDatabaseCount('attendance_records', 0);
+    }
+
+    public function test_manual_status_requires_a_teacher_token(): void
+    {
+        $this->putJson(self::BASE.'/attendance/status', [])->assertUnauthorized();
+    }
+
     public function test_exams_and_grades(): void
     {
         $this->actAs();

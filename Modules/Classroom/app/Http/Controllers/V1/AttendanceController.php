@@ -3,7 +3,11 @@
 namespace Modules\Classroom\app\Http\Controllers\V1;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Modules\Classroom\app\Models\AttendanceRecord;
 use Modules\Classroom\app\Models\ClosedSession;
 use Modules\Classroom\app\Models\Group;
@@ -70,6 +74,84 @@ class AttendanceController extends ClassroomController
             'alreadyRecorded' => $alreadyRecorded,
             'parentNotified' => $notified,
         ]);
+    }
+
+    /**
+     * The teacher's 3-way toggle: present, absent, or null (not recorded = no row). Allowed on
+     * closed sessions too (the correction path) and never opens or closes a session.
+     *
+     * Parents are told once per real change to present or absent, the same texts as scan and close.
+     * Going to null, or repeating a status, sends nothing. Every real transition notifies (no
+     * debounce); messages are sent in request order, so the last one always matches the stored state.
+     */
+    public function setStatus(Request $request): JsonResponse
+    {
+        // The raw body: the framework turns "" into null, and "" is an invalid status here.
+        $input = json_decode($request->getContent(), true);
+        $input = is_array($input) ? $input : [];
+        $validator = Validator::make($input, [
+            'groupId' => ['required', 'string', 'regex:/^\d{1,18}$/'],
+            'studentId' => ['required', 'string', 'regex:/^\d{1,18}$/'],
+            'date' => ['required', 'string', 'date_format:Y-m-d', 'before_or_equal:tomorrow'],
+        ]);
+
+        // `status` must be in the body but may be null, which Laravel's `required` rejects.
+        $statusOk = array_key_exists('status', $input)
+            && ($input['status'] === null || in_array($input['status'], [AttendanceRecord::PRESENT, AttendanceRecord::ABSENT], true));
+
+        if ($validator->fails() || ! $statusOk) {
+            return $this->fail('invalid_request', 400);
+        }
+
+        $group = Group::find($input['groupId']);
+        $student = $group ? Student::where('group_id', $group->id)->find($input['studentId']) : null;
+
+        if (! $group || ! $student) {
+            return $this->fail('student_not_found', 404);
+        }
+
+        $status = $input['status'];
+        $date = $input['date'];
+
+        $previous = DB::transaction(function () use ($student, $group, $date, $status) {
+            $find = fn () => AttendanceRecord::where('student_id', $student->id)
+                ->where('group_id', $group->id)->whereDate('date', $date)->lockForUpdate()->first();
+            $record = $find();
+            $before = $record?->status;
+
+            if ($status === null) {
+                $record?->delete();
+            } elseif ($record) {
+                $record->update(['status' => $status]);
+            } else {
+                try {
+                    // A savepoint, so losing a race on the unique key doesn't poison the transaction.
+                    DB::transaction(fn () => AttendanceRecord::create([
+                        'student_id' => $student->id, 'group_id' => $group->id, 'date' => $date, 'status' => $status,
+                    ]));
+                } catch (UniqueConstraintViolationException) {
+                    $record = $find();
+                    $before = $record?->status;
+                    $record?->update(['status' => $status]);
+                }
+            }
+
+            return $before;
+        });
+
+        // After commit, and a Telegram failure never touches the saved status (the client never throws).
+        if ($status !== null && $status !== $previous) {
+            $student->setRelation('group', $group);
+            $notified = $status === AttendanceRecord::PRESENT
+                ? $this->notifier->present($student, $date)
+                : $this->notifier->absent($student, $date);
+
+            if ($notified) {
+                Log::info('attendance parent notified', ['student' => $student->id, 'group' => $group->id, 'status' => $status]);
+            }
+        }
+
+        return $this->successResponse('OK', ['studentId' => (string) $student->id, 'status' => $status]);
     }
 
     public function close(Request $request): JsonResponse

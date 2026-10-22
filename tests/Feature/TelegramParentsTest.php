@@ -146,6 +146,47 @@ class TelegramParentsTest extends TestCase
         $this->assertCount(1, array_slice($this->sentTexts(), $already));
     }
 
+    public function test_manual_status_notifies_the_parent_once_per_real_change(): void
+    {
+        $this->actAs();
+        $student = $this->makeStudent();
+        $this->shareContact('201001234567');
+        $already = count($this->sentTexts());
+        $put = fn (?string $status) => $this->putJson(self::BASE.'/attendance/status', [
+            'groupId' => (string) $student['groupId'], 'studentId' => (string) $student['id'], 'date' => now()->toDateString(), 'status' => $status,
+        ])->assertOk();
+
+        $put('present');
+        $put('present');
+        $this->assertCount(1, array_slice($this->sentTexts(), $already));
+        $put('absent');
+        $this->assertCount(2, array_slice($this->sentTexts(), $already));
+        $put(null);
+        $put(null);
+        $this->assertCount(2, array_slice($this->sentTexts(), $already));
+
+        // Absent was told here, so close must not count or tell it again.
+        $put('absent');
+        $this->postJson(self::BASE.'/attendance/close', ['groupId' => (int) $student['groupId'], 'date' => now()->toDateString()])
+            ->assertJsonPath('data.absentCount', 0);
+        $this->assertCount(3, array_slice($this->sentTexts(), $already));
+    }
+
+    public function test_manual_status_survives_a_telegram_failure_and_an_unlinked_parent(): void
+    {
+        $this->actAs();
+        $student = $this->makeStudent();
+        $put = fn (string $status) => $this->putJson(self::BASE.'/attendance/status', [
+            'groupId' => (string) $student['groupId'], 'studentId' => (string) $student['id'], 'date' => now()->toDateString(), 'status' => $status,
+        ]);
+
+        $put('present')->assertOk();
+        $this->shareContact('201001234567');
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => false], 500)]);
+        $put('absent')->assertOk()->assertJsonPath('data.status', 'absent');
+        $this->assertDatabaseHas('attendance_records', ['student_id' => $student['id'], 'status' => 'absent']);
+    }
+
     public function test_admin_sees_the_shared_bot_as_active_and_cannot_change_it(): void
     {
         $teacher = Teacher::create(['name' => 'T', 'username' => 'tt', 'password' => 'Str0ng!Pass1']);

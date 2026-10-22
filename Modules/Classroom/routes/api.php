@@ -31,6 +31,7 @@ Route::prefix('v1/teacher')
 
         Route::get('attendance/session', [AttendanceController::class, 'session']);
         Route::post('attendance/scan', [AttendanceController::class, 'scan']);
+        Route::put('attendance/status', [AttendanceController::class, 'setStatus']);
         Route::post('attendance/close', [AttendanceController::class, 'close']);
 
         Route::get('exams', [ExamController::class, 'index']);
