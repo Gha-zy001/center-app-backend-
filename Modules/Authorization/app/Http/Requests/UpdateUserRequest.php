@@ -21,11 +21,7 @@ class UpdateUserRequest extends FormRequest
                 'sometimes',
                 'string', 
                 'confirmed',
-                Password::min(8)
-                    ->letters()
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols(), 
+                Password::min(6), 
             ],
             'roles' => 'nullable|array',
             'roles.*' => 'exists:roles,name,guard_name,web',

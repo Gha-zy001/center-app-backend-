@@ -15,7 +15,7 @@ class UpdateTeacherPasswordRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'password' => ['required', 'string', Password::min(8)->letters()->mixedCase()->numbers()],
+            'password' => ['required', 'string', Password::min(6)],
         ];
     }
 }

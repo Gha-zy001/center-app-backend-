@@ -44,7 +44,7 @@ class StoreTeacherRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[a-z0-9._-]+$/', 'unique:teachers,username'],
             // Optional: when omitted a temporary password is generated and returned once.
-            'password' => ['nullable', 'string', Password::min(8)->letters()->mixedCase()->numbers()],
+            'password' => ['nullable', 'string', Password::min(6)],
             'phone' => ['nullable', 'string', 'max:30'],
         ];
     }
