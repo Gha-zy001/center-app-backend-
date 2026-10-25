@@ -12,9 +12,42 @@ use Throwable;
  */
 class TelegramClient
 {
+    /** @var string|null a specific bot's token; null means the shared platform bot */
+    private ?string $token = null;
+
+    /** A client speaking as another bot (a teacher's own bot, or the manager bot). */
+    public function withToken(?string $token): static
+    {
+        $clone = clone $this;
+        $clone->token = $token;
+
+        return $clone;
+    }
+
     public function isConfigured(): bool
     {
-        return (bool) config('services.telegram.token');
+        return (bool) $this->token();
+    }
+
+    private function token(): ?string
+    {
+        return $this->token ?? config('services.telegram.token');
+    }
+
+    /** The bot's own profile: used to check a token and learn its username. */
+    public function getMe(): ?array
+    {
+        $me = $this->call('getMe');
+
+        return is_array($me) ? $me : null;
+    }
+
+    /** The token of a bot created through this (manager) bot. */
+    public function getManagedBotToken(int $botUserId): ?string
+    {
+        $token = $this->call('getManagedBotToken', ['user_id' => $botUserId]);
+
+        return is_string($token) && $token !== '' ? $token : null;
     }
 
     public function botLink(): ?string
@@ -39,12 +72,12 @@ class TelegramClient
         $this->call('deleteWebhook');
     }
 
-    public function setWebhook(string $url): bool
+    public function setWebhook(string $url, ?string $secret = null, array $allowedUpdates = ['message']): bool
     {
         return $this->call('setWebhook', [
             'url' => $url,
-            'secret_token' => config('services.telegram.webhook_secret'),
-            'allowed_updates' => ['message'],
+            'secret_token' => $secret ?? config('services.telegram.webhook_secret'),
+            'allowed_updates' => $allowedUpdates,
         ]) !== null;
     }
 
@@ -55,7 +88,7 @@ class TelegramClient
         }
 
         try {
-            $response = Http::timeout($timeout)->post('https://api.telegram.org/bot'.config('services.telegram.token').'/'.$method, $payload);
+            $response = Http::timeout($timeout)->post('https://api.telegram.org/bot'.$this->token().'/'.$method, $payload);
 
             if (! $response->successful() || ! $response->json('ok')) {
                 // The URL holds the token, so only the method and Telegram's own description are logged.

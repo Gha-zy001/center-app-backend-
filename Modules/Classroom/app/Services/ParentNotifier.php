@@ -5,6 +5,7 @@ namespace Modules\Classroom\app\Services;
 use Modules\Classroom\app\Models\Exam;
 use Modules\Classroom\app\Models\Group;
 use Modules\Classroom\app\Models\Student;
+use Modules\Classroom\app\Models\TeacherBot;
 
 /**
  * Messages the parents linked to a student. Must be called inside the teacher's request: the
@@ -52,16 +53,23 @@ class ParentNotifier
      */
     private function send(Student $student, string $text): bool
     {
-        $chatIds = $student->telegramContacts()->pluck('chat_id')->all();
+        $contacts = $student->telegramContacts()->get(['chat_id', 'teacher_bot_id']);
 
-        if ($chatIds === []) {
+        if ($contacts->isEmpty()) {
             return false;
         }
 
+        // Each parent is reached through the bot they linked with: the teacher's own, or the shared one.
+        $bots = TeacherBot::whereIn('id', $contacts->pluck('teacher_bot_id')->filter()->unique())->get()->keyBy('id');
+        $deliveries = $contacts->map(fn ($contact) => [
+            'chatId' => $contact->chat_id,
+            'client' => $contact->teacher_bot_id ? $this->telegram->withToken($bots[$contact->teacher_bot_id]?->token) : $this->telegram,
+        ])->all();
+
         // After the response, so a slow Telegram never slows the teacher's screen.
-        defer(function () use ($chatIds, $text) {
-            foreach ($chatIds as $chatId) {
-                $this->telegram->sendMessage($chatId, $text);
+        defer(function () use ($deliveries, $text) {
+            foreach ($deliveries as $delivery) {
+                $delivery['client']->sendMessage($delivery['chatId'], $text);
             }
         });
 

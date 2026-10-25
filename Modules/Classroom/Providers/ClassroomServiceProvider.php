@@ -4,6 +4,7 @@ namespace Modules\Classroom\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Classroom\app\Console\PollTelegramCommand;
+use Modules\Classroom\app\Console\SetManagerWebhookCommand;
 use Modules\Classroom\app\Console\SetTelegramWebhookCommand;
 use Modules\Classroom\app\Models\Group;
 use Modules\Classroom\app\Models\Student;
@@ -15,7 +16,7 @@ class ClassroomServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        $this->commands([PollTelegramCommand::class, SetTelegramWebhookCommand::class]);
+        $this->commands([PollTelegramCommand::class, SetTelegramWebhookCommand::class, SetManagerWebhookCommand::class]);
 
         $this->app->register(RouteServiceProvider::class);
     }

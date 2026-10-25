@@ -4,6 +4,7 @@ namespace Modules\Teachers\app\Http\Controllers\V1;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Modules\Classroom\app\Models\TeacherBot;
 use Modules\Teachers\app\Models\Teacher;
 
 /**
@@ -15,7 +16,9 @@ class AdminTeacherBotController extends Controller
 {
     public function show(Teacher $teacher): JsonResponse
     {
-        $username = config('services.telegram.bot_username');
+        // The teacher's own bot when they made one, otherwise the shared platform bot.
+        $own = TeacherBot::where('teacher_id', $teacher->id)->value('username');
+        $username = $own ?: config('services.telegram.bot_username');
 
         return $this->successResponse('OK', [
             'bot' => $username ? ['name' => $username, 'username' => $username, 'status' => 'active'] : null,

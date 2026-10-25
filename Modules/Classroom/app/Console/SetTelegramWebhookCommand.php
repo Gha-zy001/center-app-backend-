@@ -13,7 +13,7 @@ class SetTelegramWebhookCommand extends Command
 
     public function handle(TelegramClient $telegram): int
     {
-        if (! $telegram->setWebhook($this->argument('url'))) {
+        if (! $telegram->setWebhook($this->argument('url'), null, ['message', 'managed_bot'])) {
             $this->error('Telegram refused the webhook (check the token, the URL and TELEGRAM_WEBHOOK_SECRET).');
 
             return self::FAILURE;

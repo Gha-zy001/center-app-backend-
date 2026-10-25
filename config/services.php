@@ -81,6 +81,10 @@ return [
         'token' => env('TELEGRAM_BOT_TOKEN'),
         'bot_username' => env('TELEGRAM_BOT_USERNAME'),
         'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+        // The manager bot ("Bot Management Mode" in BotFather) that creates each teacher's own bot. Unset, it is the shared platform bot itself, which then serves both jobs on one webhook.
+        'manager_token' => env('TELEGRAM_MANAGER_BOT_TOKEN') ?: env('TELEGRAM_BOT_TOKEN'),
+        'manager_username' => env('TELEGRAM_MANAGER_BOT_USERNAME') ?: env('TELEGRAM_BOT_USERNAME'),
+        'manager_webhook_secret' => env('TELEGRAM_MANAGER_WEBHOOK_SECRET') ?: env('TELEGRAM_WEBHOOK_SECRET'),
     ],
 
     'twilio' => [

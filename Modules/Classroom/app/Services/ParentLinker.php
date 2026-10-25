@@ -4,6 +4,7 @@ namespace Modules\Classroom\app\Services;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Classroom\app\Models\Student;
+use Modules\Classroom\app\Models\TeacherBot;
 use Modules\Classroom\app\Models\TelegramContact;
 use Modules\Classroom\app\Support\PhoneKey;
 
@@ -16,7 +17,19 @@ use Modules\Classroom\app\Support\PhoneKey;
  */
 class ParentLinker
 {
-    public function __construct(private readonly TelegramClient $telegram) {}
+    private ?TeacherBot $bot = null;
+
+    public function __construct(private TelegramClient $telegram) {}
+
+    /** The same linking through one teacher's own bot: only that teacher's students can be linked. */
+    public function forBot(TeacherBot $bot, TelegramClient $telegram): static
+    {
+        $clone = clone $this;
+        $clone->bot = $bot;
+        $clone->telegram = $telegram->withToken($bot->token);
+
+        return $clone;
+    }
 
     public function handle(array $update): void
     {
@@ -73,7 +86,7 @@ class ParentLinker
 
         DB::transaction(function () use ($students, $chatId, $name) {
             foreach ($students as $student) {
-                $row = TelegramContact::withoutGlobalScopes()->firstOrNew(['student_id' => $student->id, 'chat_id' => $chatId]);
+                $row = TelegramContact::withoutGlobalScopes()->firstOrNew(['student_id' => $student->id, 'chat_id' => $chatId, 'teacher_bot_id' => $this->bot?->id]);
                 $row->forceFill(['teacher_id' => $student->teacher_id, 'name' => $name])->save();
             }
         });
@@ -96,6 +109,7 @@ class ParentLinker
 
         return Student::withoutGlobalScopes()
             ->with(['group' => fn ($query) => $query->withoutGlobalScopes()])
+            ->when($this->bot, fn ($query, $bot) => $query->where('teacher_id', $bot->teacher_id))
             ->where(function ($query) use ($key) {
                 $query->where('parent_phone', 'like', '%'.$key)
                     ->orWhere(fn ($own) => $own->where('parent_phone', '')->where('phone', 'like', '%'.$key));

@@ -14,5 +14,6 @@ class TelegramContact extends Model
 
     protected $table = 'student_telegram_contacts';
 
-    protected $fillable = ['student_id', 'chat_id', 'name'];
+    // teacher_bot_id: the teacher's own bot this parent talks to (null = the shared platform bot).
+    protected $fillable = ['student_id', 'chat_id', 'name', 'teacher_bot_id'];
 }
