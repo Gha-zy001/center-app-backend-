@@ -110,7 +110,9 @@ class TelegramClient
 
             return $response->json('result') ?? true;
         } catch (Throwable $e) {
-            Log::warning("Telegram {$method} errored", ['exception' => $e::class]);
+            // cURL messages quote the request URL, which holds the token: strip it before logging.
+            $reason = preg_replace('/bot\d+:[A-Za-z0-9_-]+/', 'bot<token>', $e->getMessage());
+            Log::warning("Telegram {$method} errored", ['exception' => $e::class, 'reason' => mb_substr($reason, 0, 300)]);
 
             return null;
         }
