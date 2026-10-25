@@ -67,7 +67,7 @@ class ManagerBotHandler
 
         preg_match(self::START_CODE, trim((string) ($message['text'] ?? '')), $match);
 
-        $request = TeacherBotRequest::where('code', $match[1])->where('expires_at', '>', now())->first();
+        $request = TeacherBotRequest::where('code', $match[1])->first();
         $teacher = $request ? Teacher::find($request->teacher_id) : null;
 
         if (! $request || ! $teacher || ! $teacher->isActive()) {
@@ -93,7 +93,7 @@ class ManagerBotHandler
         $username = (string) ($managed['bot']['username'] ?? '');
 
         $request = $creatorId && $botId
-            ? TeacherBotRequest::where('telegram_user_id', $creatorId)->where('expires_at', '>', now())->latest('id')->first()
+            ? TeacherBotRequest::where('telegram_user_id', $creatorId)->latest('id')->first()
             : null;
 
         // A bot nobody asked for through the app is none of our business.

@@ -12,37 +12,47 @@ use Modules\Teachers\app\Support\TeacherContext;
 /** The signed-in teacher's own parents bot: see it, start creating it, or remove it. */
 class TeacherBotController extends ClassroomController
 {
-    private const REQUEST_MINUTES = 30;
-
     public function show(TeacherContext $context): JsonResponse
     {
         $bot = TeacherBot::where('teacher_id', $context->id())->first();
 
         return $this->successResponse('OK', [
             'bot' => $bot ? ['username' => $bot->username, 'link' => $bot->link(), 'status' => 'active'] : null,
+            // The link to give parents, always: the teacher's own bot, or the shared platform bot until they have one.
+            'parentsLink' => $bot?->link() ?? $this->sharedBotLink(),
             'managerConfigured' => $this->managerUsername() !== '',
+            // The link the teacher generated stays available until the bot is created.
+            'pending' => $this->pendingPayload($this->pendingRequest($context->id())),
         ]);
     }
 
     // Returns the manager bot's start link. The teacher opens it in Telegram and finishes there.
+    // The link never expires: asking again returns the same one, until the bot is created.
     public function connect(TeacherContext $context): JsonResponse
     {
         if ($this->managerUsername() === '' || ! config('services.telegram.manager_token')) {
             return $this->fail('manager_bot_not_configured', 503);
         }
 
-        TeacherBotRequest::where('teacher_id', $context->id())->delete();
-
-        $request = TeacherBotRequest::create([
+        $request = $this->pendingRequest($context->id()) ?? TeacherBotRequest::create([
             'teacher_id' => $context->id(),
             'code' => Str::random(32),
-            'expires_at' => now()->addMinutes(self::REQUEST_MINUTES),
+            'expires_at' => null,
         ]);
 
-        return $this->successResponse('OK', [
+        return $this->successResponse('OK', $this->pendingPayload($request));
+    }
+
+    private function pendingRequest(int $teacherId): ?TeacherBotRequest
+    {
+        return TeacherBotRequest::where('teacher_id', $teacherId)->latest('id')->first();
+    }
+
+    private function pendingPayload(?TeacherBotRequest $request): ?array
+    {
+        return $request ? [
             'startLink' => 'https://t.me/'.$this->managerUsername().'?start='.$request->code,
-            'expiresAt' => $request->expires_at->toIso8601String(),
-        ]);
+        ] : null;
     }
 
     // Removing the bot also removes the parents linked through it (they can link again through any bot).
@@ -56,6 +66,13 @@ class TeacherBotController extends ClassroomController
         }
 
         return $this->successResponse('OK');
+    }
+
+    private function sharedBotLink(): ?string
+    {
+        $username = ltrim((string) config('services.telegram.bot_username'), '@');
+
+        return $username !== '' ? 'https://t.me/'.$username : null;
     }
 
     private function managerUsername(): string

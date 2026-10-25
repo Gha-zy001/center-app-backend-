@@ -70,9 +70,12 @@ class TeacherBotTest extends TestCase
     public function test_teacher_creates_a_bot_through_the_manager_bot(): void
     {
         $this->actAs();
-        $this->getJson(self::BASE.'/bot')->assertJsonPath('data.bot', null)->assertJsonPath('data.managerConfigured', true);
+        config(['services.telegram.bot_username' => 'shared_bot']);
+        $this->getJson(self::BASE.'/bot')->assertJsonPath('data.bot', null)->assertJsonPath('data.managerConfigured', true)
+            ->assertJsonPath('data.parentsLink', 'https://t.me/shared_bot');
 
         $bot = $this->createBot();
+        $this->getJson(self::BASE.'/bot')->assertJsonPath('data.parentsLink', 'https://t.me/ahmed_parents_bot');
 
         $this->assertSame('NEW:BOTTOKEN', $bot->token);
         $this->assertDatabaseMissing('teacher_bots', ['token' => 'NEW:BOTTOKEN']); // stored encrypted
@@ -114,6 +117,23 @@ class TeacherBotTest extends TestCase
 
         $this->assertDatabaseHas('student_telegram_contacts', ['student_id' => $student['id'], 'chat_id' => '555', 'teacher_bot_id' => null]);
         $this->assertCount(1, $this->sentTo('SHARED:TOKEN'));
+    }
+
+    public function test_generated_link_stays_visible_until_the_bot_exists(): void
+    {
+        $this->actAs();
+        $this->getJson(self::BASE.'/bot')->assertJsonPath('data.pending', null);
+
+        $link = $this->postJson(self::BASE.'/bot/connect')->assertOk()->json('data.startLink');
+        $this->getJson(self::BASE.'/bot')->assertJsonPath('data.pending.startLink', $link);
+        $this->postJson(self::BASE.'/bot/connect')->assertJsonPath('data.startLink', $link); // same link, not a new one
+
+        $this->travel(30)->days();
+        $this->getJson(self::BASE.'/bot')->assertJsonPath('data.pending.startLink', $link); // never expires
+        $this->travelBack();
+
+        $this->createBot();
+        $this->getJson(self::BASE.'/bot')->assertJsonPath('data.pending', null)->assertJsonPath('data.bot.username', 'ahmed_parents_bot');
     }
 
     public function test_connect_needs_the_manager_bot_configured(): void
