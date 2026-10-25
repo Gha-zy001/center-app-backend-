@@ -2,6 +2,7 @@
 
 namespace Modules\Classroom\app\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -12,6 +13,8 @@ use Throwable;
  */
 class TelegramClient
 {
+    private const SAFE_TO_RETRY = ['getMe', 'getManagedBotToken', 'setWebhook', 'deleteWebhook'];
+
     /** @var string|null a specific bot's token; null means the shared platform bot */
     private ?string $token = null;
 
@@ -88,7 +91,15 @@ class TelegramClient
         }
 
         try {
-            $response = Http::timeout($timeout)->post('https://api.telegram.org/bot'.$this->token().'/'.$method, $payload);
+            $request = Http::timeout($timeout);
+
+            // A dropped connection while setting a bot up is retried (these calls are safe to repeat).
+            // Messages are not: a lost reply could mean the parent already got it.
+            if (in_array($method, self::SAFE_TO_RETRY, true)) {
+                $request = $request->retry(3, 400, fn ($e) => $e instanceof ConnectionException, throw: false);
+            }
+
+            $response = $request->post('https://api.telegram.org/bot'.$this->token().'/'.$method, $payload);
 
             if (! $response->successful() || ! $response->json('ok')) {
                 // The URL holds the token, so only the method and Telegram's own description are logged.

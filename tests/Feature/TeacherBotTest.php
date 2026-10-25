@@ -136,6 +136,21 @@ class TeacherBotTest extends TestCase
         $this->getJson(self::BASE.'/bot')->assertJsonPath('data.pending', null)->assertJsonPath('data.bot.username', 'ahmed_parents_bot');
     }
 
+    public function test_a_dropped_connection_while_activating_the_bot_is_retried(): void
+    {
+        $this->actAs();
+        Http::fake([
+            'api.telegram.org/botMANAGER:TOKEN/getManagedBotToken' => Http::response(['ok' => true, 'result' => 'NEW:BOTTOKEN']),
+            'api.telegram.org/botNEW:BOTTOKEN/setWebhook' => Http::sequence()
+                ->pushFailedConnection()->pushFailedConnection()->push(['ok' => true, 'result' => true]),
+            'api.telegram.org/*' => Http::response(['ok' => true, 'result' => true]),
+        ]);
+
+        $this->createBot();
+
+        $this->assertDatabaseCount('teacher_bots', 1);
+    }
+
     public function test_connect_needs_the_manager_bot_configured(): void
     {
         $this->actAs();
