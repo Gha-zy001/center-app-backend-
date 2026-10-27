@@ -60,6 +60,9 @@ class SubscriptionService implements TeacherAccessGate
     {
         return DB::transaction(function () use ($teacher, $package, $extend) {
             $current = $this->current($teacher);
+            // Queuing after the running period only makes sense when renewing the same package.
+            // Switching to a different one always starts now, whatever the client asked for.
+            $extend = $extend && $current && $current->package_id === $package->id;
             $running = $current && ! $current->isExpired();
             $startsAt = $extend && $running ? $current->ends_at->copy() : now();
 

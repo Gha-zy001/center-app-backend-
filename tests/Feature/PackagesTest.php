@@ -182,6 +182,27 @@ class PackagesTest extends TestCase
         $this->assertSame(1, TeacherSubscription::where('ends_at', '>', now())->count());
     }
 
+    public function test_switching_to_another_package_starts_now_even_if_extend_is_sent(): void
+    {
+        $this->actAsAdmin();
+        $three = $this->package(['name' => 'Three', 'duration_days' => 3]);
+        $six = $this->package(['name' => 'Six', 'duration_days' => 6]);
+        $teacher = $this->teacher();
+        $url = "/api/v1/admin/teachers/{$teacher->id}/subscription";
+
+        $this->postJson($url, ['packageId' => $three->id])->assertCreated()->assertJsonPath('data.daysLeft', 3);
+
+        foreach ([false, true] as $extend) {
+            $response = $this->postJson($url, ['packageId' => $six->id, 'extend' => $extend])->assertCreated()
+                ->assertJsonPath('data.daysLeft', 6)->assertJsonPath('data.package.name', 'Six');
+            $this->assertSame(now()->toIso8601String(), $response->json('data.startsAt'));
+            $this->postJson($url, ['packageId' => $three->id])->assertCreated()->assertJsonPath('data.daysLeft', 3);
+        }
+
+        // Only one period is running at any time: nothing is queued behind it.
+        $this->assertSame(1, TeacherSubscription::where('ends_at', '>', now())->count());
+    }
+
     public function test_an_expired_package_locks_the_teacher_out_at_once(): void
     {
         $this->actAsAdmin();
