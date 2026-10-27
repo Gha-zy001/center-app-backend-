@@ -199,6 +199,45 @@ class TeacherBotTest extends TestCase
         $this->assertCount(0, $this->sentTo('SHARED:TOKEN'));
     }
 
+    public function test_a_parent_on_both_bots_is_told_once_through_the_teachers_bot(): void
+    {
+        $this->actAs();
+        $student = $this->makeStudent('Omar', '01001234567');
+        $contact = ['message' => ['chat' => ['id' => 555, 'type' => 'private'], 'from' => ['id' => 555, 'first_name' => 'Ali'],
+            'contact' => ['phone_number' => '201001234567', 'user_id' => 555]]];
+
+        // Linked on the shared bot first, then the teacher makes a bot and the same parent links there too.
+        $this->postJson('/api/v1/telegram/webhook', $contact, ['X-Telegram-Bot-Api-Secret-Token' => 'shared-secret'])->assertOk();
+        $bot = $this->createBot();
+        $this->linkParent($bot);
+        $this->assertDatabaseCount('student_telegram_contacts', 2);
+
+        $sharedBefore = count($this->sentTo('SHARED:TOKEN'));
+        $ownBefore = count($this->sentTo('NEW:BOTTOKEN'));
+        $this->putJson(self::BASE.'/attendance/status', [
+            'groupId' => (string) $student['groupId'], 'studentId' => (string) $student['id'], 'date' => now()->toDateString(), 'status' => 'present',
+        ])->assertOk();
+
+        $this->assertCount($ownBefore + 1, $this->sentTo('NEW:BOTTOKEN'));
+        $this->assertCount($sharedBefore, $this->sentTo('SHARED:TOKEN'));
+    }
+
+    public function test_a_parent_only_on_the_shared_bot_still_gets_messages_after_the_teacher_has_a_bot(): void
+    {
+        $this->actAs();
+        $student = $this->makeStudent('Omar', '01001234567');
+        $this->postJson('/api/v1/telegram/webhook', ['message' => ['chat' => ['id' => 555, 'type' => 'private'], 'from' => ['id' => 555],
+            'contact' => ['phone_number' => '201001234567', 'user_id' => 555]]], ['X-Telegram-Bot-Api-Secret-Token' => 'shared-secret'])->assertOk();
+        $this->createBot();
+
+        $before = count($this->sentTo('SHARED:TOKEN'));
+        $this->putJson(self::BASE.'/attendance/status', [
+            'groupId' => (string) $student['groupId'], 'studentId' => (string) $student['id'], 'date' => now()->toDateString(), 'status' => 'absent',
+        ])->assertOk();
+
+        $this->assertCount($before + 1, $this->sentTo('SHARED:TOKEN'));
+    }
+
     public function test_removing_the_bot_drops_it_and_its_parents(): void
     {
         $this->actAs();
