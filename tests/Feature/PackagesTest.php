@@ -35,30 +35,29 @@ class PackagesTest extends TestCase
 
     private function package(array $attributes = []): Package
     {
-        return Package::create($attributes + ['name' => 'Basic', 'duration_days' => 30, 'max_users' => 5, 'is_active' => true]);
+        return Package::create($attributes + ['name' => 'Basic', 'duration_days' => 30, 'is_active' => true]);
     }
 
     public function test_admin_manages_packages_with_the_four_fields(): void
     {
         $this->actAsAdmin();
 
-        $id = $this->postJson('/api/v1/admin/packages', ['name' => 'Basic', 'durationDays' => 30, 'maxUsers' => 5, 'isActive' => true])
+        $id = $this->postJson('/api/v1/admin/packages', ['name' => 'Basic', 'durationDays' => 30, 'isActive' => true])
             ->assertCreated()
             ->assertJsonPath('data.name', 'Basic')
             ->assertJsonPath('data.durationDays', 30)
-            ->assertJsonPath('data.maxUsers', 5)
             ->assertJsonPath('data.isActive', true)
             ->json('data.id');
 
-        $this->postJson('/api/v1/admin/packages', ['name' => 'Basic', 'durationDays' => 90, 'maxUsers' => 20])->assertStatus(422);
-        $this->postJson('/api/v1/admin/packages', ['name' => 'Bad', 'durationDays' => 0, 'maxUsers' => 20])->assertStatus(422);
-        $this->postJson('/api/v1/admin/packages', ['name' => 'Pro', 'durationDays' => 90, 'maxUsers' => 20])->assertCreated();
+        $this->postJson('/api/v1/admin/packages', ['name' => 'Basic', 'durationDays' => 90])->assertStatus(422);
+        $this->postJson('/api/v1/admin/packages', ['name' => 'Bad', 'durationDays' => 0])->assertStatus(422);
+        $this->postJson('/api/v1/admin/packages', ['name' => 'Pro', 'durationDays' => 90])->assertCreated();
 
         $this->putJson("/api/v1/admin/packages/$id", ['isActive' => false])->assertOk()
             ->assertJsonPath('data.isActive', false)->assertJsonPath('data.name', 'Basic');
         $this->getJson('/api/v1/admin/packages?isActive=1')->assertOk()->assertJsonCount(1, 'data');
         $this->getJson('/api/v1/admin/packages?search=pr')->assertJsonCount(1, 'data');
-        $this->getJson("/api/v1/admin/packages/$id")->assertOk()->assertJsonPath('data.subscribersCount', 0);
+        $this->getJson("/api/v1/admin/packages/$id")->assertOk()->assertJsonPath('data.usersCount', 0);
         $this->deleteJson("/api/v1/admin/packages/$id")->assertOk();
         $this->assertDatabaseCount('packages', 1);
     }
@@ -70,7 +69,7 @@ class PackagesTest extends TestCase
         $teacher = $this->teacher();
 
         $this->getJson('/api/v1/admin/packages')->assertOk();
-        $this->postJson('/api/v1/admin/packages', ['name' => 'X', 'durationDays' => 1, 'maxUsers' => 1])->assertForbidden();
+        $this->postJson('/api/v1/admin/packages', ['name' => 'X', 'durationDays' => 1])->assertForbidden();
         $this->putJson("/api/v1/admin/packages/{$package->id}", ['name' => 'Y'])->assertForbidden();
         $this->deleteJson("/api/v1/admin/packages/{$package->id}")->assertForbidden();
         $this->postJson("/api/v1/admin/teachers/{$teacher->id}/subscription", ['packageId' => $package->id])->assertForbidden();
@@ -84,11 +83,49 @@ class PackagesTest extends TestCase
         $teacher = $this->teacher();
 
         // No permission was ever created or granted: the role alone is enough.
-        $package = $this->postJson('/api/v1/admin/packages', ['name' => 'Basic', 'durationDays' => 30, 'maxUsers' => 5])->assertCreated()->json('data');
+        $package = $this->postJson('/api/v1/admin/packages', ['name' => 'Basic', 'durationDays' => 30])->assertCreated()->json('data');
         $this->getJson('/api/v1/admin/packages')->assertOk();
         $this->postJson("/api/v1/admin/teachers/{$teacher->id}/subscription", ['packageId' => $package['id']])->assertCreated();
         $this->getJson('/api/v1/admin/subscriptions')->assertOk();
         $this->deleteJson("/api/v1/admin/packages/{$package['id']}")->assertStatus(409);
+    }
+
+    public function test_a_packages_users_count_is_the_teachers_on_it_right_now(): void
+    {
+        $this->actAsAdmin();
+        $basic = $this->package(['name' => 'Basic']);
+        $pro = $this->package(['name' => 'Pro', 'duration_days' => 90]);
+        [$a, $b] = [$this->teacher('a'), $this->teacher('b')];
+        $count = fn (Package $package) => $this->getJson("/api/v1/admin/packages/{$package->id}")->json('data.usersCount');
+        $give = fn (Teacher $teacher, Package $package, bool $extend = false) => $this->postJson(
+            "/api/v1/admin/teachers/{$teacher->id}/subscription", ['packageId' => $package->id, 'extend' => $extend])->assertCreated();
+
+        $this->assertSame([0, 0], [$count($basic), $count($pro)]);
+
+        $give($a, $basic);
+        $give($b, $basic);
+        $this->assertSame(2, $count($basic));
+        $this->postJson('/api/v1/admin/packages', ['name' => 'New', 'durationDays' => 7])->assertCreated()->assertJsonPath('data.usersCount', 0);
+
+        // A teacher moved to another package counts there only, and a queued renewal is not counted yet.
+        $give($a, $pro);
+        $this->assertSame([1, 1], [$count($basic), $count($pro)]);
+        $give($b, $basic, extend: true);
+        $this->assertSame(1, $count($basic));
+
+        $rows = collect($this->getJson('/api/v1/admin/packages')->json('data'))->pluck('usersCount', 'name');
+        $this->assertSame(1, $rows['Basic']);
+        $this->assertSame(1, $rows['Pro']);
+
+        // Day 31: b's queued renewal (it began at day 30) is now the running period, and a is still on Pro.
+        $this->travel(31)->days();
+        $this->assertSame([1, 1], [$count($basic), $count($pro)]);
+
+        // Day 61: b's renewal ended. Day 91: a's Pro ended too.
+        $this->travel(30)->days();
+        $this->assertSame([0, 1], [$count($basic), $count($pro)]);
+        $this->travel(30)->days();
+        $this->assertSame([0, 0], [$count($basic), $count($pro)]);
     }
 
     public function test_admin_gives_a_teacher_a_package(): void
@@ -104,13 +141,13 @@ class PackagesTest extends TestCase
             ->assertJsonPath('data.daysLeft', 90);
 
         $this->getJson("/api/v1/admin/teachers/{$teacher->id}/subscription")->assertOk()
-            ->assertJsonPath('data.current.package.maxUsers', 5)->assertJsonCount(1, 'data.history');
+            ->assertJsonPath('data.current.package.name', 'Basic')->assertJsonCount(1, 'data.history');
         $this->getJson('/api/v1/admin/subscriptions')->assertOk()->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.teacher.username', 'ahmed');
         $this->getJson('/api/v1/admin/subscriptions?status=expired')->assertJsonCount(0, 'data');
         $this->getJson('/api/v1/admin/subscriptions?expiresInDays=30')->assertJsonCount(0, 'data');
         $this->getJson('/api/v1/admin/subscriptions?expiresInDays=100')->assertJsonCount(1, 'data');
-        $this->getJson("/api/v1/admin/packages/{$package->id}")->assertJsonPath('data.subscribersCount', 1);
+        $this->getJson("/api/v1/admin/packages/{$package->id}")->assertJsonPath('data.usersCount', 1);
     }
 
     public function test_an_inactive_package_cannot_be_given_and_a_used_one_cannot_be_deleted(): void

@@ -21,7 +21,6 @@ class PackageRequest extends FormRequest
         return [
             'name' => [$required, 'string', 'max:80', Rule::unique('packages', 'name')->ignore($package)],
             'durationDays' => [$required, 'integer', 'min:1', 'max:3650'],
-            'maxUsers' => [$required, 'integer', 'min:1', 'max:1000000'],
             'isActive' => ['sometimes', 'boolean'],
         ];
     }
@@ -34,7 +33,6 @@ class PackageRequest extends FormRequest
         return array_filter([
             'name' => isset($data['name']) ? trim($data['name']) : null,
             'duration_days' => $data['durationDays'] ?? null,
-            'max_users' => $data['maxUsers'] ?? null,
             'is_active' => $data['isActive'] ?? null,
         ], fn ($value) => $value !== null);
     }

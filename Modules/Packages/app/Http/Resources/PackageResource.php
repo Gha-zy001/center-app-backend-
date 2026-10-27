@@ -13,9 +13,9 @@ class PackageResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'durationDays' => $this->duration_days,
-            'maxUsers' => $this->max_users,
             'isActive' => $this->is_active,
-            'subscribersCount' => $this->whenCounted('subscriptions'),
+            // Read-only: how many teachers are on this package right now.
+            'usersCount' => $this->when(isset($this->users_count), fn () => (int) $this->users_count),
             'createdAt' => $this->created_at?->toDateTimeString(),
         ];
     }

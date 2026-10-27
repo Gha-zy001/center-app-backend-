@@ -9,7 +9,7 @@ use Modules\Packages\app\Http\Requests\PackageRequest;
 use Modules\Packages\app\Http\Resources\PackageResource;
 use Modules\Packages\app\Models\Package;
 
-/** The packages the center sells: name, length in days, how many users, and whether it can be given out. */
+/** The packages the center sells: name, length in days, how many teachers are on it (computed), and whether it can be given out. */
 class AdminPackageController extends Controller
 {
     public function index(Request $request): JsonResponse
@@ -17,7 +17,7 @@ class AdminPackageController extends Controller
         $search = trim((string) $request->query('search', ''));
 
         $packages = Package::query()
-            ->withCount('subscriptions')
+            ->withUsersCount()
             ->when($request->has('isActive'), fn ($query) => $query->where('is_active', $request->boolean('isActive')))
             ->when($search !== '', fn ($query) => $query->where('name', 'like', '%'.addcslashes($search, '%_\\').'%'))
             ->orderBy('id')
@@ -28,21 +28,27 @@ class AdminPackageController extends Controller
 
     public function show(Package $package): JsonResponse
     {
-        return $this->successResponse(__('messages.package_fetched_successfully'), new PackageResource($package->loadCount('subscriptions')));
+        return $this->successResponse(__('messages.package_fetched_successfully'), new PackageResource($this->withUsers($package)));
     }
 
     public function store(PackageRequest $request): JsonResponse
     {
         $package = Package::create($request->columns());
 
-        return $this->successResponse(__('messages.package_created_successfully'), new PackageResource($package), 201);
+        return $this->successResponse(__('messages.package_created_successfully'), new PackageResource($this->withUsers($package)), 201);
     }
 
     public function update(PackageRequest $request, Package $package): JsonResponse
     {
         $package->update($request->columns());
 
-        return $this->successResponse(__('messages.package_updated_successfully'), new PackageResource($package->loadCount('subscriptions')));
+        return $this->successResponse(__('messages.package_updated_successfully'), new PackageResource($this->withUsers($package)));
+    }
+
+    // The package with its read-only users_count (the teachers on it right now).
+    private function withUsers(Package $package): Package
+    {
+        return Package::query()->withUsersCount()->findOrFail($package->id);
     }
 
     // A package that was ever given to a teacher stays for the history: switch it off instead.
