@@ -76,6 +76,21 @@ class PackagesTest extends TestCase
         $this->postJson("/api/v1/admin/teachers/{$teacher->id}/subscription", ['packageId' => $package->id])->assertForbidden();
     }
 
+    public function test_a_super_admin_needs_no_package_permissions(): void
+    {
+        $admin = Admin::create(['name' => 'Root', 'email' => 'root@example.com', 'password' => 'x']);
+        $admin->assignRole(\Spatie\Permission\Models\Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'admin']));
+        Sanctum::actingAs($admin, ['*'], 'sanctum-admin');
+        $teacher = $this->teacher();
+
+        // No permission was ever created or granted: the role alone is enough.
+        $package = $this->postJson('/api/v1/admin/packages', ['name' => 'Basic', 'durationDays' => 30, 'maxUsers' => 5])->assertCreated()->json('data');
+        $this->getJson('/api/v1/admin/packages')->assertOk();
+        $this->postJson("/api/v1/admin/teachers/{$teacher->id}/subscription", ['packageId' => $package['id']])->assertCreated();
+        $this->getJson('/api/v1/admin/subscriptions')->assertOk();
+        $this->deleteJson("/api/v1/admin/packages/{$package['id']}")->assertStatus(409);
+    }
+
     public function test_admin_gives_a_teacher_a_package(): void
     {
         $this->actAsAdmin();
