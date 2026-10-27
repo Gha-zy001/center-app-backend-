@@ -41,6 +41,15 @@ class ParentLinker
 
         $chatId = (string) $message['chat']['id'];
 
+        // The platform bot only manages teachers' bots: parents must use their own teacher's bot.
+        if (! $this->bot && ! config('services.telegram.shared_parents_bot')) {
+            $this->telegram->sendMessage($chatId, 'البوت ده مش مخصص لأولياء الأمور. اطلب من المدرس لينك بوته الخاص واضغط Start من هناك.', [
+                'reply_markup' => ['remove_keyboard' => true],
+            ]);
+
+            return;
+        }
+
         if (isset($message['contact'])) {
             $this->link($chatId, $message);
 

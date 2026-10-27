@@ -70,7 +70,7 @@ class TeacherBotTest extends TestCase
     public function test_teacher_creates_a_bot_through_the_manager_bot(): void
     {
         $this->actAs();
-        config(['services.telegram.bot_username' => 'shared_bot']);
+        config(['services.telegram.bot_username' => 'shared_bot', 'services.telegram.shared_parents_bot' => true]);
         $this->getJson(self::BASE.'/bot')->assertJsonPath('data.bot', null)->assertJsonPath('data.managerConfigured', true)
             ->assertJsonPath('data.parentsLink', 'https://t.me/shared_bot');
 
@@ -104,6 +104,7 @@ class TeacherBotTest extends TestCase
 
     public function test_one_bot_can_be_both_manager_and_shared_parents_bot(): void
     {
+        config(['services.telegram.shared_parents_bot' => true]);
         config([
             'services.telegram.manager_token' => 'SHARED:TOKEN',
             'services.telegram.manager_webhook_secret' => 'shared-secret',
@@ -201,6 +202,7 @@ class TeacherBotTest extends TestCase
 
     public function test_a_parent_on_both_bots_is_told_once_through_the_teachers_bot(): void
     {
+        config(['services.telegram.shared_parents_bot' => true]);
         $this->actAs();
         $student = $this->makeStudent('Omar', '01001234567');
         $contact = ['message' => ['chat' => ['id' => 555, 'type' => 'private'], 'from' => ['id' => 555, 'first_name' => 'Ali'],
@@ -224,6 +226,7 @@ class TeacherBotTest extends TestCase
 
     public function test_a_parent_only_on_the_shared_bot_still_gets_messages_after_the_teacher_has_a_bot(): void
     {
+        config(['services.telegram.shared_parents_bot' => true]);
         $this->actAs();
         $student = $this->makeStudent('Omar', '01001234567');
         $this->postJson('/api/v1/telegram/webhook', ['message' => ['chat' => ['id' => 555, 'type' => 'private'], 'from' => ['id' => 555],
@@ -236,6 +239,30 @@ class TeacherBotTest extends TestCase
         ])->assertOk();
 
         $this->assertCount($before + 1, $this->sentTo('SHARED:TOKEN'));
+    }
+
+    public function test_by_default_the_platform_bot_only_manages_teachers_bots(): void
+    {
+        $this->actAs();
+        $student = $this->makeStudent('Omar', '01001234567');
+        $this->getJson(self::BASE.'/bot')->assertJsonPath('data.parentsLink', null);
+
+        // A parent writing to the platform bot is sent to their teacher's bot and is not linked.
+        $update = ['message' => ['chat' => ['id' => 555, 'type' => 'private'], 'from' => ['id' => 555],
+            'contact' => ['phone_number' => '201001234567', 'user_id' => 555]]];
+        $this->postJson('/api/v1/telegram/webhook', $update, ['X-Telegram-Bot-Api-Secret-Token' => 'shared-secret'])->assertOk();
+        $this->assertDatabaseCount('student_telegram_contacts', 0);
+        $this->assertCount(1, $this->sentTo('SHARED:TOKEN'));
+
+        // A parent linked through the old shared bot (before this switch) is no longer messaged through it.
+        \Modules\Classroom\app\Models\TelegramContact::withoutGlobalScopes()->forceCreate([
+            'teacher_id' => Teacher::first()->id, 'student_id' => $student['id'], 'chat_id' => '555', 'name' => 'Ali', 'teacher_bot_id' => null,
+        ]);
+        $before = count($this->sentTo('SHARED:TOKEN'));
+        $this->putJson(self::BASE.'/attendance/status', [
+            'groupId' => (string) $student['groupId'], 'studentId' => (string) $student['id'], 'date' => now()->toDateString(), 'status' => 'present',
+        ])->assertOk();
+        $this->assertCount($before, $this->sentTo('SHARED:TOKEN'));
     }
 
     public function test_removing_the_bot_drops_it_and_its_parents(): void

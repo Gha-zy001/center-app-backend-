@@ -81,6 +81,9 @@ return [
         'token' => env('TELEGRAM_BOT_TOKEN'),
         'bot_username' => env('TELEGRAM_BOT_USERNAME'),
         'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+        // false: the platform bot only manages teachers' own bots; parents are linked and messaged through
+        // each teacher's own bot. true brings back the shared parents bot for teachers without one.
+        'shared_parents_bot' => (bool) env('TELEGRAM_SHARED_PARENTS_BOT', false),
         // The manager bot ("Bot Management Mode" in BotFather) that creates each teacher's own bot. Unset, it is the shared platform bot itself, which then serves both jobs on one webhook.
         'manager_token' => env('TELEGRAM_MANAGER_BOT_TOKEN') ?: env('TELEGRAM_BOT_TOKEN'),
         'manager_username' => env('TELEGRAM_MANAGER_BOT_USERNAME') ?: env('TELEGRAM_BOT_USERNAME'),

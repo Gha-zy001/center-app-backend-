@@ -28,6 +28,7 @@ class TelegramParentsTest extends TestCase
             'services.telegram.token' => 'TEST:TOKEN',
             'services.telegram.bot_username' => 'followup_bot',
             'services.telegram.webhook_secret' => self::SECRET,
+            'services.telegram.shared_parents_bot' => true,
         ]);
         Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => true])]);
     }

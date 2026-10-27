@@ -18,8 +18,9 @@ class TeacherBotController extends ClassroomController
 
         return $this->successResponse('OK', [
             'bot' => $bot ? ['username' => $bot->username, 'link' => $bot->link(), 'status' => 'active'] : null,
-            // The link to give parents, always: the teacher's own bot, or the shared platform bot until they have one.
-            'parentsLink' => $bot?->link() ?? $this->sharedBotLink(),
+            // The link to give parents: the teacher's own bot. The shared platform bot only counts while it
+            // still serves parents; otherwise it is null until the teacher creates their bot.
+            'parentsLink' => $bot?->link() ?? (config('services.telegram.shared_parents_bot') ? $this->sharedBotLink() : null),
             'managerConfigured' => $this->managerUsername() !== '',
             // The link the teacher generated stays available until the bot is created.
             'pending' => $this->pendingPayload($this->pendingRequest($context->id())),

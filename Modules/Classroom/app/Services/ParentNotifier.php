@@ -53,7 +53,10 @@ class ParentNotifier
      */
     private function send(Student $student, string $text): bool
     {
-        $contacts = $student->telegramContacts()->get(['chat_id', 'teacher_bot_id']);
+        $contacts = $student->telegramContacts()
+            // Parents linked through the old shared bot are only messaged while that bot is still in use.
+            ->when(! config('services.telegram.shared_parents_bot'), fn ($query) => $query->whereNotNull('teacher_bot_id'))
+            ->get(['chat_id', 'teacher_bot_id']);
 
         if ($contacts->isEmpty()) {
             return false;
