@@ -1,0 +1,11 @@
+{
+    "name": "Packages",
+    "alias": "packages",
+    "description": "Subscription packages the center sells to teachers, and which package each teacher is on.",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Packages\\Providers\\PackagesServiceProvider"
+    ],
+    "files": []
+}

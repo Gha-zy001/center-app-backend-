@@ -42,4 +42,16 @@ return [
     'default_user_role_locked' => 'The default user role cannot be renamed or deleted.',
     'role_name_format' => 'Use lowercase letters, numbers, dashes or underscores (e.g. "team-lead").',
     'permission_name_format' => 'Use lowercase letters, numbers, dashes or underscores (e.g. "export-reports").',
+
+    'packages_fetched_successfully' => 'Packages fetched successfully',
+    'package_fetched_successfully' => 'Package fetched successfully',
+    'package_created_successfully' => 'Package created successfully',
+    'package_updated_successfully' => 'Package updated successfully',
+    'package_deleted_successfully' => 'Package deleted successfully',
+    'package_in_use' => 'This package was given to teachers and cannot be deleted. Deactivate it instead.',
+    'package_inactive' => 'This package is not active, so it cannot be given to a teacher.',
+    'subscriptions_fetched_successfully' => 'Subscriptions fetched successfully',
+    'subscription_fetched_successfully' => 'Subscription fetched successfully',
+    'subscription_assigned_successfully' => 'Package assigned to the teacher successfully',
+    'subscription_expired' => 'Your package has ended. Please contact the center to renew it.',
 ];

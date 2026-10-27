@@ -4,6 +4,7 @@ namespace Modules\Teachers\app\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Modules\Teachers\app\Contracts\TeacherAccessGate;
 use Modules\Teachers\app\Models\Teacher;
 use Modules\Teachers\app\Support\TeacherContext;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,6 +31,10 @@ class ResolveTeacherContext
             return $this->deny(__('messages.account_inactive'), 403);
         }
 
+        if ($reason = $this->denial($teacher)) {
+            return $this->deny(__($reason), 403);
+        }
+
         $request->setUserResolver(fn () => $teacher);
         $this->context->set($teacher);
 
@@ -38,6 +43,12 @@ class ResolveTeacherContext
         } finally {
             $this->context->clear();
         }
+    }
+
+    // An active account can still be refused by another module, e.g. an expired subscription.
+    private function denial(Teacher $teacher): ?string
+    {
+        return app()->bound(TeacherAccessGate::class) ? app(TeacherAccessGate::class)->denial($teacher) : null;
     }
 
     private function deny(string $message, int $status): Response

@@ -6,5 +6,6 @@
     "Authorization":  true,
     "Blog":  true,
     "Teachers":  true,
-    "Classroom":  true
+    "Classroom":  true,
+    "Packages":  true
 }

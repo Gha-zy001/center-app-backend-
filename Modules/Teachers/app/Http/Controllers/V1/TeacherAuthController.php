@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Modules\Teachers\app\Contracts\TeacherAccessGate;
 use Modules\Teachers\app\Http\Resources\TeacherResource;
 use Modules\Teachers\app\Models\Teacher;
 
@@ -30,6 +31,10 @@ class TeacherAuthController extends Controller
         // Only reported after the password matched, so status is never leaked to a guesser.
         if (! $teacher->isActive()) {
             return $this->errorResponse(__('messages.account_inactive'), null, 403);
+        }
+
+        if (app()->bound(TeacherAccessGate::class) && $reason = app(TeacherAccessGate::class)->denial($teacher)) {
+            return $this->errorResponse(__($reason), null, 403);
         }
 
         $teacher->forceFill(['last_login_at' => now()])->save();

@@ -42,4 +42,16 @@ return [
     'default_user_role_locked' => 'لا يمكن إعادة تسمية دور المستخدم الافتراضي أو حذفه.',
     'role_name_format' => 'استخدم أحرفًا إنجليزية صغيرة أو أرقامًا أو شرطات (مثال: "team-lead").',
     'permission_name_format' => 'استخدم أحرفًا إنجليزية صغيرة أو أرقامًا أو شرطات (مثال: "export-reports").',
+
+    'packages_fetched_successfully' => 'تم جلب الباقات بنجاح',
+    'package_fetched_successfully' => 'تم جلب الباقة بنجاح',
+    'package_created_successfully' => 'تم إنشاء الباقة بنجاح',
+    'package_updated_successfully' => 'تم تحديث الباقة بنجاح',
+    'package_deleted_successfully' => 'تم حذف الباقة بنجاح',
+    'package_in_use' => 'الباقة دي اتعطت لمدرسين فمينفعش تتحذف. عطّلها بدل الحذف.',
+    'package_inactive' => 'الباقة دي غير نشطة فمينفعش تتعطي لمدرس.',
+    'subscriptions_fetched_successfully' => 'تم جلب الاشتراكات بنجاح',
+    'subscription_fetched_successfully' => 'تم جلب الاشتراك بنجاح',
+    'subscription_assigned_successfully' => 'تم تعيين الباقة للمدرس بنجاح',
+    'subscription_expired' => 'انتهت مدة باقتك. تواصل مع السنتر لتجديدها.',
 ];
