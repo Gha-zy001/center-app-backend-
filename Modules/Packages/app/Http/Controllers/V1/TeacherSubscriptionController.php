@@ -15,6 +15,10 @@ class TeacherSubscriptionController extends Controller
     {
         $current = $subscriptions->current($request->user());
 
-        return $this->successResponse('OK', ['subscription' => $current ? new SubscriptionResource($current) : null]);
+        return $this->successResponse('OK', [
+            'subscription' => $current ? new SubscriptionResource($current) : null,
+            // "Less than 48 hours left", or null.
+            'notice' => $subscriptions->notice($request->user()),
+        ]);
     }
 }

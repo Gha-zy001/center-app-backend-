@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Modules\Teachers\app\Contracts\TeacherAccessGate;
 use Modules\Teachers\app\Http\Resources\TeacherResource;
@@ -30,17 +31,21 @@ class TeacherAuthController extends Controller
 
         // Only reported after the password matched, so status is never leaked to a guesser.
         if (! $teacher->isActive()) {
-            return $this->errorResponse(__('messages.account_inactive'), null, 403);
+            return $this->refuse(__('messages.account_inactive'), 'account_suspended');
         }
 
-        if (app()->bound(TeacherAccessGate::class) && $reason = app(TeacherAccessGate::class)->denial($teacher)) {
-            return $this->errorResponse(__($reason), null, 403);
+        $gate = app()->bound(TeacherAccessGate::class) ? app(TeacherAccessGate::class) : null;
+
+        if ($gate && $reason = $gate->denial($teacher)) {
+            return $this->refuse(__($reason), Str::after($reason, 'messages.'));
         }
 
         $teacher->forceFill(['last_login_at' => now()])->save();
 
         return $this->successResponse(__('auth.messages.logged_in_successfully'), [
             'teacher' => new TeacherResource($teacher),
+            // e.g. "your package ends in less than 48 hours"; null when there is nothing to warn about.
+            'notice' => $gate?->notice($teacher),
             'accessToken' => $teacher->createToken('teacher_token', ['*'], now()->addHours(self::TOKEN_TTL_HOURS))->plainTextToken,
             'tokenType' => 'Bearer',
             'accessExpiresIn' => self::TOKEN_TTL_HOURS * 3600,
@@ -49,7 +54,16 @@ class TeacherAuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        return $this->successResponse('OK', new TeacherResource($request->user()));
+        $teacher = $request->user();
+        $gate = app()->bound(TeacherAccessGate::class) ? app(TeacherAccessGate::class) : null;
+
+        return $this->successResponse('OK', (new TeacherResource($teacher))->resolve() + ['notice' => $gate?->notice($teacher)]);
+    }
+
+    // A refusal carries a machine-readable `code` so the app can show the right screen without parsing the text.
+    private function refuse(string $message, string $code): JsonResponse
+    {
+        return response()->json(['success' => false, 'message' => $message, 'data' => null, 'code' => $code], 403);
     }
 
     public function logout(Request $request): JsonResponse

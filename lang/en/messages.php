@@ -30,7 +30,7 @@ return [
     'permissions_fetched_successfully' => 'Permissions fetched successfully',
     'permission_created_successfully' => 'Permission created successfully',
     'permission_deleted_successfully' => 'Permission deleted successfully',
-    'account_inactive' => 'This account is suspended. Please contact the center.',
+    'account_inactive' => 'Your access to the platform has ended. Please contact the center.',
     'teachers_fetched_successfully' => 'Teachers fetched successfully',
     'teacher_fetched_successfully' => 'Teacher fetched successfully',
     'teacher_created_successfully' => 'Teacher created successfully',
@@ -54,4 +54,5 @@ return [
     'subscription_fetched_successfully' => 'Subscription fetched successfully',
     'subscription_assigned_successfully' => 'Package assigned to the teacher successfully',
     'subscription_expired' => 'Your package has ended. Please contact the center to renew it.',
+    'subscription_expiring' => 'Less than 48 hours left before your package ends.',
 ];

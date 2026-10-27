@@ -200,6 +200,56 @@ class PackagesTest extends TestCase
         $login()->assertForbidden();
     }
 
+    public function test_a_teacher_is_warned_in_the_last_48_hours_at_login_and_in_the_app(): void
+    {
+        $this->actAsAdmin();
+        $teacher = $this->teacher();
+        $package = $this->package(['duration_days' => 10]);
+        $this->postJson("/api/v1/admin/teachers/{$teacher->id}/subscription", ['packageId' => $package->id])->assertCreated();
+        $login = fn () => $this->postJson('/api/v1/teacher/auth/login', ['username' => 'ahmed', 'password' => 'Str0ng!Pass1'])->assertOk();
+
+        // Plenty of time left: no warning anywhere.
+        $login()->assertJsonPath('data.notice', null);
+
+        // 47 hours before the end.
+        $this->travel(10 * 24 - 47)->hours();
+        $response = $login();
+        $response->assertJsonPath('data.notice.code', 'subscription_expiring')
+            ->assertJsonPath('data.notice.hoursLeft', 47)
+            ->assertJsonPath('data.notice.message', 'Less than 48 hours left before your package ends.');
+        $token = $response->json('data.accessToken');
+
+        $this->withToken($token)->getJson('/api/v1/teacher/auth/me')->assertOk()
+            ->assertJsonPath('data.notice.code', 'subscription_expiring')->assertJsonPath('data.username', 'ahmed');
+        $this->withToken($token)->getJson('/api/v1/teacher/subscription')->assertOk()
+            ->assertJsonPath('data.notice.hoursLeft', 47)->assertJsonPath('data.subscription.status', 'active');
+
+        // Renewing clears the warning.
+        $this->postJson("/api/v1/admin/teachers/{$teacher->id}/subscription", ['packageId' => $package->id])->assertCreated();
+        $login()->assertJsonPath('data.notice', null);
+    }
+
+    public function test_login_says_why_access_was_refused(): void
+    {
+        $this->actAsAdmin();
+        $teacher = $this->teacher();
+        $package = $this->package();
+        $login = fn () => $this->postJson('/api/v1/teacher/auth/login', ['username' => 'ahmed', 'password' => 'Str0ng!Pass1']);
+
+        // Deactivated by the admin: the access has ended.
+        $teacher->update(['status' => 'suspended']);
+        $login()->assertForbidden()->assertJsonPath('code', 'account_suspended')
+            ->assertJsonPath('message', 'Your access to the platform has ended. Please contact the center.');
+        $this->withHeader('Accept-Language', 'ar')->postJson('/api/v1/teacher/auth/login', ['username' => 'ahmed', 'password' => 'Str0ng!Pass1'])
+            ->assertForbidden()->assertJsonPath('message', 'انتهت صلاحية وصولك للمنصة. يرجى التواصل مع السنتر.');
+
+        // Package ended: a different code, so the app can say "renew".
+        $teacher->update(['status' => 'active']);
+        $this->postJson("/api/v1/admin/teachers/{$teacher->id}/subscription", ['packageId' => $package->id])->assertCreated();
+        $this->travel(31)->days();
+        $login()->assertForbidden()->assertJsonPath('code', 'subscription_expired');
+    }
+
     public function test_the_hourly_job_suspends_the_account_and_a_renewal_brings_it_back(): void
     {
         $this->actAsAdmin();

@@ -28,11 +28,11 @@ class ResolveTeacherContext
         }
 
         if (! $teacher->isActive()) {
-            return $this->deny(__('messages.account_inactive'), 403);
+            return $this->deny(__('messages.account_inactive'), 403, 'account_suspended');
         }
 
         if ($reason = $this->denial($teacher)) {
-            return $this->deny(__($reason), 403);
+            return $this->deny(__($reason), 403, str_replace('messages.', '', $reason));
         }
 
         $request->setUserResolver(fn () => $teacher);
@@ -51,8 +51,8 @@ class ResolveTeacherContext
         return app()->bound(TeacherAccessGate::class) ? app(TeacherAccessGate::class)->denial($teacher) : null;
     }
 
-    private function deny(string $message, int $status): Response
+    private function deny(string $message, int $status, ?string $code = null): Response
     {
-        return response()->json(['success' => false, 'message' => $message, 'data' => null], $status);
+        return response()->json(['success' => false, 'message' => $message, 'data' => null] + ($code ? ['code' => $code] : []), $status);
     }
 }

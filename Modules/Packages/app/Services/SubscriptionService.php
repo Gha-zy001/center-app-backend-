@@ -32,6 +32,26 @@ class SubscriptionService implements TeacherAccessGate
         return $current && $current->isExpired() ? 'messages.subscription_expired' : null;
     }
 
+    // Hours before the end of a package at which the teacher starts seeing the warning.
+    public const WARN_HOURS = 48;
+
+    // "Your package ends in less than 48 hours": null when it ends later, has ended, or there is no package.
+    public function notice(Teacher $teacher): ?array
+    {
+        $current = $this->current($teacher);
+
+        if (! $current || $current->isExpired() || $current->ends_at->gt(now()->addHours(self::WARN_HOURS))) {
+            return null;
+        }
+
+        return [
+            'code' => 'subscription_expiring',
+            'message' => __('messages.subscription_expiring'),
+            'endsAt' => $current->ends_at->toIso8601String(),
+            'hoursLeft' => max(1, (int) ceil(now()->diffInSeconds($current->ends_at, false) / 3600)),
+        ];
+    }
+
     /**
      * Starts a package for a teacher. By default it starts now and replaces the running one; with
      * $extend it begins when the running one ends, so no paid days are lost.

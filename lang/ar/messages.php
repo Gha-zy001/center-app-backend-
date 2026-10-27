@@ -30,7 +30,7 @@ return [
     'permissions_fetched_successfully' => 'تم جلب الأذونات بنجاح',
     'permission_created_successfully' => 'تم إنشاء الإذن بنجاح',
     'permission_deleted_successfully' => 'تم حذف الإذن بنجاح',
-    'account_inactive' => 'هذا الحساب موقوف. يرجى التواصل مع السنتر.',
+    'account_inactive' => 'انتهت صلاحية وصولك للمنصة. يرجى التواصل مع السنتر.',
     'teachers_fetched_successfully' => 'تم جلب المدرسين بنجاح',
     'teacher_fetched_successfully' => 'تم جلب بيانات المدرس بنجاح',
     'teacher_created_successfully' => 'تم إنشاء المدرس بنجاح',
@@ -54,4 +54,5 @@ return [
     'subscription_fetched_successfully' => 'تم جلب الاشتراك بنجاح',
     'subscription_assigned_successfully' => 'تم تعيين الباقة للمدرس بنجاح',
     'subscription_expired' => 'انتهت مدة باقتك. تواصل مع السنتر لتجديدها.',
+    'subscription_expiring' => 'باقي أقل من 48 ساعة على انتهاء باقتك.',
 ];
